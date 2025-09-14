@@ -4,8 +4,8 @@ import { Card, Table, Alert } from 'antd';
 
 export function TopCustomers() {
     const { data: customers, isLoading, isError, error } = useQuery({
-        queryKey: ['topCustomers'],
-        queryFn: getTopCustomers
+        queryKey: ['topCustomers', 5],
+        queryFn: () => getTopCustomers(5)
     });
 
     const columns = [
@@ -24,7 +24,7 @@ export function TopCustomers() {
             {isError && <Alert message={`Error: ${error.message}`} type="error" style={{ marginBottom: 16 }} />}
             <Table
                 columns={columns}
-                dataSource={customers}
+                dataSource={(customers || []).slice(0,5)}
                 loading={isLoading}
                 rowKey="id"
                 pagination={{ pageSize: 5 }}
