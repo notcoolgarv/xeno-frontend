@@ -1,4 +1,15 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const runtimeWindow: any = typeof window !== 'undefined' ? window : {};
+const envBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+let API_BASE_URL = envBase?.replace(/\/$/, '') || '';
+if (!API_BASE_URL) {
+    if (runtimeWindow?.location && runtimeWindow.location.port === '5173') {
+        API_BASE_URL = '/api';
+    } else if (runtimeWindow?.location) {
+        API_BASE_URL = `${runtimeWindow.location.origin}/api`;
+    } else {
+        API_BASE_URL = 'http://localhost:3000/api';
+    }
+}
 
 let apiKey: string | null = null;
 let tenantBasicEmail: string | null = null;
@@ -145,7 +156,7 @@ export const getOrders = (startDate?: string, endDate?: string) => {
     return fetcher<Order[]>(`${API_BASE_URL}/orders?${params.toString()}`);
 };
 
-export const getTopCustomers = () => fetcher<Customer[]>(`${API_BASE_URL}/customers/top-spenders`);
+export const getTopCustomers = (limit = 5) => fetcher<Customer[]>(`${API_BASE_URL}/customers/top-spenders?limit=${limit}`);
 
 export const getTenants = () => fetcher<Tenant[]>(`${API_BASE_URL}/tenants`);
 
