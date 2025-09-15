@@ -12,14 +12,14 @@ interface TenantDetailsProps {
 const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
     const queryClient = useQueryClient();
     const { message } = App.useApp();
-    const { user, isTenant } = useAuth();
+    const { user, isTenant, isAdmin } = useAuth();
 
-    // Check if user is authenticated as a tenant user
-    const isAuthenticated = isTenant && user?.kind === 'tenant';
+    // Check if user is authenticated (either admin or tenant)
+    const isAuthenticated = isAdmin || (isTenant && user?.kind === 'tenant');
     const currentTenantId = user?.kind === 'tenant' ? user.tenantId : null;
 
-    // Only fetch data if authenticated and this matches the tenant's actual ID
-    const canAccessData = isAuthenticated && currentTenantId === tenantId;
+    // Admin can access any tenant's data, tenant can only access their own
+    const canAccessData = isAdmin || (isAuthenticated && currentTenantId === tenantId);
 
     const { data: analytics, isLoading: isLoadingAnalytics, error: analyticsError } = useQuery<TenantAnalytics>({
         queryKey: ['analytics', tenantId],
@@ -57,21 +57,21 @@ const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
                     type="warning" 
                     showIcon 
                     message="Authentication Required" 
-                    description="Please log in as a tenant user to view analytics and manage data ingestion."
+                    description="Please log in as an admin or tenant user to view analytics and manage data ingestion."
                 />
             </Card>
         );
     }
 
-    // Show access denied if trying to access wrong tenant
-    if (isAuthenticated && currentTenantId !== tenantId) {
+    // Show access denied if tenant trying to access wrong tenant (admins can access any)
+    if (isTenant && !isAdmin && currentTenantId !== tenantId) {
         return (
             <Card title="Tenant Details">
                 <Alert 
                     type="error" 
                     showIcon 
                     message="Access Denied" 
-                    description="You can only access data for your own tenant."
+                    description="You can only access data for your own tenant. Admins can view all tenants."
                 />
             </Card>
         );
@@ -83,8 +83,12 @@ const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
                 <Alert 
                     type="success" 
                     showIcon 
-                    message={`Authenticated as: ${user?.email || 'Tenant User'}`}
-                    description={`Shop: ${user?.kind === 'tenant' ? user.shopDomain : 'Loading...'}`}
+                    message={`Authenticated as: ${user?.email || 'User'} ${isAdmin ? '(Admin)' : '(Tenant)'}`}
+                    description={
+                        isAdmin 
+                            ? `Viewing tenant: ${tenantId}` 
+                            : `Shop: ${user?.kind === 'tenant' ? user.shopDomain : 'Loading...'}`
+                    }
                 />
                 
                 <Button
