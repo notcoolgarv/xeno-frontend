@@ -11,7 +11,6 @@ if (!API_BASE_URL) {
     }
 }
 
-let apiKey: string | null = null;
 let tenantBasicEmail: string | null = null;
 let tenantBasicPassword: string | null = null;
 
@@ -22,21 +21,6 @@ export function setTenantBasicAuth(email: string | null, password: string | null
 export function clearTenantBasicAuth() {
     tenantBasicEmail = null;
     tenantBasicPassword = null;
-}
-
-export function setApiKey(key: string | null) {
-    apiKey = key;
-    if (key) {
-        try { localStorage.setItem('xeno_api_key', key); } catch {}
-    } else {
-        try { localStorage.removeItem('xeno_api_key'); } catch {}
-    }
-}
-export function loadStoredApiKey() {
-    if (!apiKey) {
-        try { apiKey = localStorage.getItem('xeno_api_key'); } catch {}
-    }
-    return apiKey;
 }
 
 export interface Customer {
@@ -102,7 +86,6 @@ class FetchError extends Error {
 
 function authHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
-    if (apiKey) headers['X-API-Key'] = apiKey;
     if (tenantBasicEmail && tenantBasicPassword) {
         const encoded = btoa(`${tenantBasicEmail}:${tenantBasicPassword}`);
         headers['Authorization'] = `Basic ${encoded}`;

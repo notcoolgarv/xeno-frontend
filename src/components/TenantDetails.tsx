@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTenantAnalytics, getTenantLogs, ingestData, type SyncLog, type TenantAnalytics, setApiKey, loadStoredApiKey } from '../lib/api';
-import { useState } from 'react';
-import { Card, Button, Row, Col, Statistic, List, Spin, App, Space, Input, Typography, Divider, Alert } from 'antd';
+import { getTenantAnalytics, getTenantLogs, ingestData, type SyncLog, type TenantAnalytics } from '../lib/api';
+import { Card, Button, Row, Col, Statistic, List, Spin, App, Space, Alert } from 'antd';
 import { RevenueOverTimeChart } from './RevenueOverTimeChart';
 import { EventsSummaryChart } from './EventsSummaryChart';
+import { useAuth } from '../context/AuthContext';
 
 interface TenantDetailsProps {
     tenantId: string;
@@ -11,20 +11,26 @@ interface TenantDetailsProps {
 
 const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
     const queryClient = useQueryClient();
-    const [apiKeyInput, setApiKeyInput] = useState<string>(loadStoredApiKey() || '');
     const { message } = App.useApp();
+    const { user, isTenant } = useAuth();
 
-    const hasApiKey = !!apiKeyInput.trim();
+    // Check if user is authenticated as a tenant user
+    const isAuthenticated = isTenant && user?.kind === 'tenant';
+    const currentTenantId = user?.kind === 'tenant' ? user.tenantId : null;
+
+    // Only fetch data if authenticated and this matches the tenant's actual ID
+    const canAccessData = isAuthenticated && currentTenantId === tenantId;
+
     const { data: analytics, isLoading: isLoadingAnalytics, error: analyticsError } = useQuery<TenantAnalytics>({
         queryKey: ['analytics', tenantId],
         queryFn: () => getTenantAnalytics(tenantId),
-        enabled: !!tenantId && hasApiKey,
+        enabled: canAccessData,
     });
 
     const { data: logs, isLoading: isLoadingLogs, error: logsError } = useQuery<SyncLog[]>({
         queryKey: ['logs', tenantId],
         queryFn: () => getTenantLogs(tenantId),
-        enabled: !!tenantId && hasApiKey,
+        enabled: canAccessData,
     });
 
     const ingestMutation = useMutation({
@@ -43,47 +49,60 @@ const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
         ingestMutation.mutate();
     };
 
-    const handleSaveApiKey = () => {
-        setApiKey(apiKeyInput.trim() || null);
-        message.success('API key updated');
-        queryClient.invalidateQueries({ queryKey: ['analytics', tenantId] });
-        queryClient.invalidateQueries({ queryKey: ['logs', tenantId] });
-        queryClient.invalidateQueries({ queryKey: ['events-summary', tenantId] });
-        queryClient.invalidateQueries({ queryKey: ['revenue-over-time', tenantId] });
-    };
+    // Show authentication required message if not authenticated
+    if (!isAuthenticated) {
+        return (
+            <Card title="Tenant Details">
+                <Alert 
+                    type="warning" 
+                    showIcon 
+                    message="Authentication Required" 
+                    description="Please log in as a tenant user to view analytics and manage data ingestion."
+                />
+            </Card>
+        );
+    }
+
+    // Show access denied if trying to access wrong tenant
+    if (isAuthenticated && currentTenantId !== tenantId) {
+        return (
+            <Card title="Tenant Details">
+                <Alert 
+                    type="error" 
+                    showIcon 
+                    message="Access Denied" 
+                    description="You can only access data for your own tenant."
+                />
+            </Card>
+        );
+    }
 
     return (
         <Card title="Tenant Details">
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Typography.Text strong>Authentication</Typography.Text>
-                <Input.Password
-                    placeholder="Enter API key (xsk_...)"
-                    value={apiKeyInput}
-                    onChange={e => setApiKeyInput(e.target.value)}
-                    onPressEnter={handleSaveApiKey}
+                <Alert 
+                    type="success" 
+                    showIcon 
+                    message={`Authenticated as: ${user?.email || 'Tenant User'}`}
+                    description={`Shop: ${user?.kind === 'tenant' ? user.shopDomain : 'Loading...'}`}
                 />
-                <Button onClick={handleSaveApiKey}>Set API Key</Button>
-                <Divider style={{ margin: '12px 0' }} />
-                                <Button
+                
+                <Button
                     type="primary"
                     onClick={handleIngest}
-                                        loading={ingestMutation.isPending}
-                                        disabled={!hasApiKey}
+                    loading={ingestMutation.isPending}
+                    disabled={!canAccessData}
                     block
                 >
                     Trigger Data Ingestion
                 </Button>
 
-                                {!hasApiKey && (
-                                    <Alert type="info" showIcon message="Set a tenant API key above to load analytics and trigger ingestion." />
-                                )}
-
-                                {analyticsError && hasApiKey && (
-                                    <Alert type="error" showIcon message={(analyticsError as any).message || 'Analytics error'} />
-                                )}
-                                {logsError && hasApiKey && (
-                                    <Alert type="error" showIcon message={(logsError as any).message || 'Logs error'} />
-                                )}
+                {analyticsError && (
+                    <Alert type="error" showIcon message={(analyticsError as any).message || 'Analytics error'} />
+                )}
+                {logsError && (
+                    <Alert type="error" showIcon message={(logsError as any).message || 'Logs error'} />
+                )}
 
                 <Spin spinning={isLoadingAnalytics}>
                     <Row gutter={16}>
@@ -103,7 +122,7 @@ const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
                 <EventsSummaryChart tenantId={tenantId} />
 
                 <div>
-                    <h3 className="text-xl font-bold mb-2">Sync Logs</h3>
+                    <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Sync Logs</h3>
                     <List
                         size="small"
                         bordered
@@ -111,8 +130,12 @@ const TenantDetails = ({ tenantId }: TenantDetailsProps) => {
                         dataSource={logs}
                         renderItem={(log) => (
                             <List.Item>
-                                <span className="text-gray-500 text-xs mr-2">{new Date(log.timestamp).toLocaleString()}</span>
-                                <span className="font-mono text-xs">[{log.level}]: {log.message}</span>
+                                <span style={{ color: '#8c8c8c', fontSize: '12px', marginRight: '8px' }}>
+                                    {new Date(log.timestamp).toLocaleString()}
+                                </span>
+                                <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                                    [{log.level}]: {log.message}
+                                </span>
                             </List.Item>
                         )}
                         style={{ height: 250, overflowY: 'auto' }}

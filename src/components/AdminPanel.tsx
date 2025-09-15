@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, Space, Input, Button, Typography, Divider, List, Tag, App, Popconfirm, Alert, Tooltip } from 'antd';
-import { generateTenantApiKey, listTenantApiKeys, revokeTenantApiKey, setApiKey, adminBootstrap, adminLogin, adminLogout, adminMe, listTenantUsers } from '../lib/api';
+import { generateTenantApiKey, listTenantApiKeys, revokeTenantApiKey, adminBootstrap, adminLogin, adminLogout, adminMe, listTenantUsers } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -91,11 +91,6 @@ const AdminPanel = ({ tenantId }: AdminPanelProps) => {
     onError: (e: any) => message.error(e.message || 'Logout failed')
   });
 
-  const handleUseKey = (key: string) => {
-    setApiKey(key);
-    message.success('Active API key set for tenant analytics');
-  };
-
   return (
     <Card title="Admin & Key Management" size="small">
       <Space direction="vertical" style={{ width: '100%' }} size="small">
@@ -158,9 +153,6 @@ const AdminPanel = ({ tenantId }: AdminPanelProps) => {
               renderItem={(k: any) => (
                 <List.Item
                   actions={[
-                    <Button key="use" size="small" onClick={() => handleUseKey('[hidden key raw not stored]')} disabled>
-                      Use
-                    </Button>,
                     !k.revoked_at ? (
                       <Popconfirm key="revoke" title="Revoke this key?" onConfirm={() => revokeMutation.mutate(k.id)}>
                         <Button danger size="small" loading={revokeMutation.isPending}>Revoke</Button>
