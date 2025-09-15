@@ -265,3 +265,5 @@ export const startShopifyInstall = async (shop: string) => {
     }
     return res.json() as Promise<{ authorize_url: string; state: string; normalized_shop_domain?: string }>;
 };
+
+export const setTenantAccessToken = (token: string) => poster<{ tenant: any; updated: boolean }>(`${API_BASE_URL}/tenant/set-token`, { token });
